@@ -5,6 +5,8 @@ import os
 import argparse
 import json
 import mechanize
+import telegram
+import configparser
 from netrc import netrc
 from hashlib import md5
 from lxml import html
@@ -15,8 +17,16 @@ def mail(recipient, subject, body):
 
     proc = subprocess.Popen(["mail", "-s", subject, recipient],
                             stdin=subprocess.PIPE)
-    proc.stdin.write(body)
+    proc.stdin.write(body.encode('utf-8'))
     proc.stdin.close()
+
+def send_telegram_bot_notification():
+    config = configparser.ConfigParser()
+    config.read(os.path.expanduser('~/.tucan_telegram'))
+
+    bot = telegram.Bot(token=config['Telegram']['token'])
+    bot.send_message(chat_id=config['Telegram']['chat'], 
+        text='Hi, please check Tucan, new grades are available! \nRegards, your Bot')
 
 
 def parse_netrc():
@@ -80,6 +90,10 @@ if __name__ == "__main__":
                         help="database file")
     parser.add_argument("--new", help="print only new grades", action="store_true")
     parser.add_argument("--json", "-j", help="output json", action="store_true")
+    parser.add_argument("--telegram-notification", 
+                        dest="telegram",
+                        help="Send a notification to telegram chat configured in file ~/.tucan_telegram",
+                        action="store_true")
     args = parser.parse_args()
 
     username, password = parse_netrc()
@@ -92,6 +106,8 @@ if __name__ == "__main__":
             msg = os.linesep.join([g[0] + ": " + g[2] for g in new_grades])
             if args.mail:
                 mail(args.mail, "New Grade in TUCaN", msg)
+            if args.telegram:
+                send_telegram_bot_notification()
             else:
                 print(msg)
     else:
